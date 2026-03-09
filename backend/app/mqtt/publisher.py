@@ -5,19 +5,40 @@ from dotenv import load_dotenv
 load_dotenv()
 
 THINGSBOARD_URL = os.getenv("THINGSBOARD_URL", "https://thingsboard.cloud")
-THINGSBOARD_USERNAME = os.getenv("THINGSBOARD_USERNAME")  # Tenant admin email
-THINGSBOARD_PASSWORD = os.getenv("THINGSBOARD_PASSWORD")  # Tenant admin password
 THINGSBOARD_DEVICE_ID = os.getenv("THINGSBOARD_DEVICE_ID")  # ESP32 device ID in ThingsBoard
 
-# Cache the JWT token
+# Option 1 (recommended for OAuth/Google login): Personal Access Token generated from
+# ThingsBoard Cloud UI → Profile → Personal Access Tokens → Add
+THINGSBOARD_PAT = os.getenv("THINGSBOARD_PAT")
+
+# Option 2 (fallback): username/password credentials
+THINGSBOARD_USERNAME = os.getenv("THINGSBOARD_USERNAME")
+THINGSBOARD_PASSWORD = os.getenv("THINGSBOARD_PASSWORD")
+
+# Cache for password-based JWT token (not used when PAT is set)
 _cached_token: str | None = None
 
 
 async def _get_auth_token() -> str:
-    """Authenticate with ThingsBoard and get a JWT token."""
+    """Return a valid Bearer token for ThingsBoard API calls.
+
+    If THINGSBOARD_PAT is set it is used directly (no login request needed),
+    which is the only option when using Google / OAuth login on ThingsBoard Cloud.
+    Otherwise falls back to username + password authentication.
+    """
+    if THINGSBOARD_PAT:
+        return THINGSBOARD_PAT
+
     global _cached_token
     if _cached_token:
         return _cached_token
+
+    if not THINGSBOARD_USERNAME or not THINGSBOARD_PASSWORD:
+        raise RuntimeError(
+            "No ThingsBoard credentials found. "
+            "Set THINGSBOARD_PAT (Personal Access Token) in your .env file, "
+            "or provide THINGSBOARD_USERNAME and THINGSBOARD_PASSWORD."
+        )
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
@@ -33,7 +54,8 @@ async def _get_auth_token() -> str:
 
 
 def clear_token_cache():
-    """Clear cached token so next call re-authenticates."""
+    """Clear the cached password-based JWT token so the next call re-authenticates.
+    Has no effect when using a Personal Access Token."""
     global _cached_token
     _cached_token = None
 
