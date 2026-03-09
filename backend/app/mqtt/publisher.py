@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-THINGSBOARD_URL = os.getenv("THINGSBOARD_URL", "https://thingsboard.cloud")
+THINGSBOARD_URL = os.getenv("THINGSBOARD_URL", "https://thingsboard.cloud").rstrip("/")
 THINGSBOARD_DEVICE_ID = os.getenv("THINGSBOARD_DEVICE_ID")  # ESP32 device ID in ThingsBoard
 
 # Option 1 (recommended for OAuth/Google login): Personal Access Token generated from
@@ -20,37 +20,8 @@ _cached_token: str | None = None
 
 
 async def _get_auth_token() -> str:
-    """Return a valid Bearer token for ThingsBoard API calls.
-
-    If THINGSBOARD_PAT is set it is used directly (no login request needed),
-    which is the only option when using Google / OAuth login on ThingsBoard Cloud.
-    Otherwise falls back to username + password authentication.
-    """
-    if THINGSBOARD_PAT:
         return THINGSBOARD_PAT
 
-    global _cached_token
-    if _cached_token:
-        return _cached_token
-
-    if not THINGSBOARD_USERNAME or not THINGSBOARD_PASSWORD:
-        raise RuntimeError(
-            "No ThingsBoard credentials found. "
-            "Set THINGSBOARD_PAT (Personal Access Token) in your .env file, "
-            "or provide THINGSBOARD_USERNAME and THINGSBOARD_PASSWORD."
-        )
-
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"{THINGSBOARD_URL}/api/auth/login",
-            json={
-                "username": THINGSBOARD_USERNAME,
-                "password": THINGSBOARD_PASSWORD,
-            },
-        )
-        resp.raise_for_status()
-        _cached_token = resp.json()["token"]
-        return _cached_token
 
 
 def clear_token_cache():
@@ -68,6 +39,13 @@ async def send_rpc_command(device_id: str, light_on: bool = False, water_plant: 
     # water_plant = not water_plant
     light_on = not light_on
     token = await _get_auth_token() 
+
+    # --- ADD THIS DEBUG CHECK ---
+    if not token:
+        print("❌ ERROR: Token is empty or None. Check your .env file and load_dotenv() path.")
+        return {"status": "error", "message": "Missing token"}
+    else:
+        print(f"🔑 Using token starting with: {token[:10]}... (Length: {len(token)})")
     rpc_payload = {
         "method": "setControl",
         "params": {
@@ -78,22 +56,26 @@ async def send_rpc_command(device_id: str, light_on: bool = False, water_plant: 
         "retries" : 5
     }
 
+    rpc_url = f"{THINGSBOARD_URL}/api/rpc/oneway/{target_device}"
+
     async with httpx.AsyncClient() as client:
         resp = await client.post(
-            f"{THINGSBOARD_URL}/api/plugins/rpc/oneway/{device_id}",
+            rpc_url,
             json=rpc_payload,
-            headers={"X-Authorization": f"Bearer {token}"},
+            headers={"X-Authorization": f"ApiKey {token}"},
             timeout=10.0,
         )
 
-        # If 401, token expired — re-auth and retry once
-        if resp.status_code == 401:
+        # If 401 and using username/password auth, the cached JWT may have expired —
+        # clear the cache, fetch a fresh token, and retry once.
+        # Skip retry when using a PAT (same static token would be returned again).
+        if resp.status_code == 401 and not THINGSBOARD_PAT:
             clear_token_cache()
             token = await _get_auth_token()
             resp = await client.post(
-                f"{THINGSBOARD_URL}/api/rpc/twoway/{target_device}",
+                rpc_url,
                 json=rpc_payload,
-                headers={"X-Authorization": f"Bearer {token}"},
+                headers={"X-Authorization": f"ApiKey {token}"},
                 timeout=10.0,
             )
 
