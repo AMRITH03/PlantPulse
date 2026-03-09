@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-THINGSBOARD_URL = os.getenv("THINGSBOARD_URL", "http://localhost:8080")
+THINGSBOARD_URL = os.getenv("THINGSBOARD_URL", "https://thingsboard.cloud")
 THINGSBOARD_USERNAME = os.getenv("THINGSBOARD_USERNAME")  # Tenant admin email
 THINGSBOARD_PASSWORD = os.getenv("THINGSBOARD_PASSWORD")  # Tenant admin password
 THINGSBOARD_DEVICE_ID = os.getenv("THINGSBOARD_DEVICE_ID")  # ESP32 device ID in ThingsBoard
@@ -43,8 +43,9 @@ async def send_rpc_command(device_id: str, light_on: bool = False, water_plant: 
     if not target_device:
         raise ValueError("No device_id provided and THINGSBOARD_DEVICE_ID not set in .env")
 
-    token = await _get_auth_token()
-    light_on = not light_on  
+    # water_plant = not water_plant
+    light_on = not light_on
+    token = await _get_auth_token() 
     rpc_payload = {
         "method": "setControl",
         "params": {
