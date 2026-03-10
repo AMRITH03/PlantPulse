@@ -50,7 +50,7 @@ export default function PlantCard({ plant, onClick }) {
         )}
         {plant.last_watered && (
           <p className="text-earth-300 text-xs mt-3">
-            Last watered: {new Date(plant.last_watered).toLocaleDateString()}
+            Last watered: {new Date(plant.last_watered).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}
           </p>
         )}
       </div>

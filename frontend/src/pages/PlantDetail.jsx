@@ -175,7 +175,7 @@ export default function PlantDetail({ session }) {
                   <p className="text-xs text-earth-400 mb-1">Last watered</p>
                   <p className="font-display text-sm font-semibold text-earth-700">
                     {lastWatered
-                      ? new Date(lastWatered).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+                      ? new Date(lastWatered).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })
                       : 'Never'}
                   </p>
                 </div>
@@ -184,7 +184,7 @@ export default function PlantDetail({ session }) {
               {/* Last reading time */}
               {sensor?.timestamp && (
                 <p className="text-xs text-earth-300 mt-4">
-                  Last sensor reading: {new Date(sensor.timestamp).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                  Last sensor reading: {new Date(sensor.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}
                 </p>
               )}
             </div>
