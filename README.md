@@ -1,110 +1,95 @@
-# PlantPulse — Smart Indoor Garden Monitor
+# 🌱 PlantPulse — Edge-Based Soil Health Monitoring & Remote Irrigation System
 
-IoT-powered tabletop garden monitoring web app for indoor plants (Tulsi, Green Chilli, Spinach etc.)
-
-## How it all connects
-
-```
-ESP32 (sensors + TFLite ML)
-    → MQTT publish
-        → subscriber.py (receives + saves to Supabase)
-            → Supabase DB
-                → FastAPI backend (reads from DB)
-                    → React frontend (displays live)
-```
-
-The ESP32 runs the TFLite ML model locally and sends both sensor readings AND prediction results (watering_needed, health_status) via MQTT. The backend just stores and serves it. The frontend displays it.
+*A table-top plant care system that senses, thinks, and waters — powered by edge AI running directly on an ESP32.*
+<img width="1131" height="1600" alt="image" src="https://github.com/user-attachments/assets/03d4262b-efbd-434e-ad18-b0b2f1b8c276" />
 
 ---
 
-## Live Sensor Updates
+## Overview
 
-The Plant Detail page automatically polls for new sensor data every 30 seconds without any page refresh:
+Keeping a table-top plant alive sounds simple, but getting the watering right consistently is surprisingly hard. **PlantPulse** is an IoT and edge-AI system that takes the guesswork out of indoor plant care. A compact sensor node continuously measures soil moisture, nutrient levels (NPK), ambient temperature, and light intensity, then feeds that data into two neural networks running **directly on an ESP32 microcontroller** — one that decides whether the plant needs watering, and another that classifies its overall health.
 
-```js
-// frontend/src/pages/PlantDetail.jsx
-const interval = setInterval(async () => {
-  const sensorData = await getLatestSensorData(id)
-  setSensor(sensorData)
-}, 30000)
-```
+When irrigation is required, a relay-controlled pump waters the plant automatically, while a companion web and mobile dashboard lets users check in on their plants and step in manually whenever they'd like. By pushing the intelligence to the edge instead of the cloud, the system keeps working — and keeps the plant alive — even without a live internet connection.
 
-For demo/presentation, change `30000` to `5000` for 5 second updates — one line change.
+## Problem Statement
 
----
+Indoor table-top plants grown in homes, offices, and hostels need consistent monitoring of soil moisture, nutrient levels, and temperature to stay healthy, since these factors directly govern how well a plant absorbs water and nutrients.
 
----
+In practice, most indoor plant care still relies on fixed watering schedules or rough visual guesswork rather than the plant's actual, real-time needs. This routinely leads to:
 
-## Project Structure
+- Over-irrigation or under-watering
+- Nutrient imbalance
+- Water stress
+- Wasted water and inefficient resource use
 
-```
-plant-monitor/
-├── frontend/   → React + Vite + Tailwind
-└── backend/    → FastAPI (Python)
-```
+There is currently no compact, intelligent system that combines soil monitoring with automated irrigation for small indoor plants — which is exactly the gap this project sets out to close with a data-driven, IoT-based solution.
 
----
 
-## Running Locally
+##  Proposed Solution
 
-### Backend
-```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-# Runs on http://localhost:8000
-```
+To close these gaps, this project implements an **IoT-based soil health monitoring and smart irrigation system** purpose-built for table-top indoor plants.
 
-### Frontend
-```bash
-cd frontend
-npm install
-npm run dev
-# Runs on http://localhost:5173
-```
+The system continuously tracks:
+- Soil moisture
+- Soil nutrient levels (NPK)
+- Ambient temperature
+- Light intensity
 
----
+All sensor data is processed **locally** by machine learning models running on the ESP32 microcontroller. Based on real-time soil conditions, the system evaluates the plant's status and automatically determines whether irrigation is needed, activating a relay-controlled pump only when watering is actually required to help prevent overwatering.
 
-## Iot Integration
+## System Architecture
 
-Only need to touch ONE file: `backend/app/mqtt/subscriber.py`
+The system is organized into four cooperating layers — sensing, processing, actuation, and cloud — so that time-critical decisions, like whether to water the plant right now, never have to wait on a network round-trip.
+<img width="1342" height="840" alt="image" src="https://github.com/user-attachments/assets/108e71ac-3a54-4fda-901d-da97e4b0ccb6" />
 
-1. Install paho-mqtt: `pip install paho-mqtt`
-2. Open `subscriber.py` and fill in:
-   - `MQTT_BROKER` — your broker URL
-   - `MQTT_PORT` — usually 1883
-   - `MQTT_TOPIC` — match with ESP32 publish topic
-3. Run subscriber separately: `python -m app.mqtt.subscriber`
+##  Hardware Components
 
-ESP32 should publish this JSON to the MQTT topic:
-```json
-{
-  "plant_id": "<uuid from Supabase plants table>",
-  "soil_moisture": 42.5,
-  "temperature": 27.3,
-  "humidity": 65.0,
-  "light_intensity": 850.0,
-  "nitrogen": 75.0,
-  "phosphorus": 22.0,
-  "potassium": 110.0,
-  "watering_needed": true,
-  "health_status": "Healthy"
-}
-```
+| Component | Role | Interface |
+|---|---|---|
+| **ESP32** | Central microcontroller; runs on-device ML inference | — |
+| **DHT22** | Ambient temperature & humidity sensing | Single-wire |
+| **BH1750** | Ambient light intensity sensing | I2C |
+| **Soil Moisture Sensor** | Soil moisture sensing | Analog |
+| **NPK Sensor** | Soil nitrogen, phosphorus & potassium sensing | Modbus RTU |
+| **HC-SR04 Ultrasonic Sensor** | Water reservoir level detection | Digital |
+| **Relay Module** | Switches the pump and grow light | Digital |
+| **Water Pump** | Delivers controlled irrigation | Relay-actuated |
+| **LED Grow Light** | Supplemental plant lighting | Relay-actuated |
+| **9V Battery / Power Adapter** | System power supply | — |
 
-For light/water commands FROM the app TO ESP32, add MQTT publish calls in:
-- `backend/app/routers/controls.py` → `toggle_light()` and `trigger_water()`
-(marked with # AMRITH comments)
+## Iot Integration (Device and Component Integration)
+<img width="3000" height="1885" alt="image" src="https://github.com/user-attachments/assets/fa6cfd83-38c0-4819-a22b-d711d0e8684b" />
 
----
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/44846497-74cb-4aa5-a0e9-12cdc216e22e" width="48%" />
+  <img src="https://github.com/user-attachments/assets/e618bbb9-8a7e-459d-814f-48472202c371" width="48%" />
+</p>
 
-## NPK Thresholds
-- Nitrogen: Deficient < 40, Optimal 40–120 mg/kg
-- Phosphorus: Deficient < 10, Optimal 10–40 mg/kg  
-- Potassium: Deficient < 50, Optimal 50–200 mg/kg
+##  Edge Deployment (On-Device Inference)
 
----
+Rather than sending sensor data to the cloud for every decision, both models are deployed directly onto the ESP32:
 
-## Deployment (later)
-- Frontend → Vercel
-- Backend → Railway or Render
+1. **Train** — Models are built and trained using TensorFlow/Keras.
+2. **Convert** — Trained models are converted to TensorFlow Lite (Float32) format, optimized for embedded execution.
+3. **Deploy** — The `.tflite` models are stored in the ESP32's onboard memory.
+4. **Infer** — Sensor readings are fed directly into the TFLite interpreter, producing predictions in real time with no network call.
+
+
+##  Tech Stack
+
+| Category | Technology |
+|---|---|
+| Microcontroller | ESP32 |
+| On-Device ML | TensorFlow / Keras → TensorFlow Lite (Float32) |
+| Communication Protocols | I2C, Single-Wire, Modbus RTU, Analog, MQTT, RPC |
+| IoT Dashboard | ThingsBoard |
+| Backend API | FastAPI |
+| Database & Auth | Supabase (PostgreSQL, Row Level Security) |
+| Circuit Design | Cirkit Designer |
+| Frontend | React |
+
+## Screenshots & Demo
+### Prototype:
+<img width="1280" height="1000" alt="image" src="https://github.com/user-attachments/assets/55b0e9de-6231-4965-b63c-0f990e82d4b3" />
+
+
